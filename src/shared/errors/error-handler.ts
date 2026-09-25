@@ -1,6 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
-import { AppError } from './app-error.js';
+import { AppError, InternalError, ValidationError } from './app-error.js';
 
 interface ErrorResponseBody {
   error: {
@@ -63,15 +63,18 @@ export function handleError(
   }
 
   if (error instanceof ZodError) {
+    // Normalized through the ValidationError class so the emitted code/status
+    // stay tied to the hierarchy definition rather than duplicated literals.
+    const validationError = new ValidationError('Request validation failed', zodToDetails(error));
     const body: ErrorResponseBody = {
       error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Request validation failed',
-        details: zodToDetails(error),
+        code: validationError.code,
+        message: validationError.message,
+        details: validationError.details,
       },
       requestId,
     };
-    void reply.status(400).send(body);
+    void reply.status(validationError.statusCode).send(body);
     return;
   }
 
@@ -83,15 +86,19 @@ export function handleError(
   // code regardless of which path a validation failure took.
   const validationError = error as FastifyError;
   if (Array.isArray(validationError.validation)) {
+    const domainValidationError = new ValidationError(
+      'Request validation failed',
+      validationError.validation,
+    );
     const body: ErrorResponseBody = {
       error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Request validation failed',
-        details: validationError.validation,
+        code: domainValidationError.code,
+        message: domainValidationError.message,
+        details: domainValidationError.details,
       },
       requestId,
     };
-    void reply.status(400).send(body);
+    void reply.status(domainValidationError.statusCode).send(body);
     return;
   }
 
@@ -157,9 +164,12 @@ export function handleError(
   }
 
   request.log.error({ err: error }, 'Unhandled error');
+  // Constructed via the InternalError class so the fallback's code/status can
+  // never drift from the hierarchy definition.
+  const internalError = new InternalError('An unexpected error occurred');
   const body: ErrorResponseBody = {
-    error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' },
+    error: { code: internalError.code, message: internalError.message },
     requestId,
   };
-  void reply.status(500).send(body);
+  void reply.status(internalError.statusCode).send(body);
 }

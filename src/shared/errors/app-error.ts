@@ -18,9 +18,21 @@ export abstract class AppError extends Error {
   }
 }
 
+/**
+ * Shared status/code constants for the two hierarchy members whose HTTP
+ * behavior is also produced by framework-level code paths (Zod/Fastify
+ * validation errors, and the error handler's generic fallback). Keeping the
+ * literals here lets those branches reference the class definitions instead
+ * of duplicating them, so the class and the emitted response cannot drift.
+ */
+export const VALIDATION_ERROR_STATUS = 400;
+export const VALIDATION_ERROR_CODE = 'VALIDATION_ERROR';
+export const INTERNAL_ERROR_STATUS = 500;
+export const INTERNAL_ERROR_CODE = 'INTERNAL_ERROR';
+
 export class ValidationError extends AppError {
-  readonly statusCode = 400;
-  readonly code = 'VALIDATION_ERROR';
+  readonly statusCode = VALIDATION_ERROR_STATUS;
+  readonly code = VALIDATION_ERROR_CODE;
 }
 
 export class UnauthorizedError extends AppError {
@@ -56,6 +68,6 @@ export class BlockchainError extends AppError {
 }
 
 export class InternalError extends AppError {
-  readonly statusCode = 500;
-  readonly code = 'INTERNAL_ERROR';
+  readonly statusCode = INTERNAL_ERROR_STATUS;
+  readonly code = INTERNAL_ERROR_CODE;
 }
